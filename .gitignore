@@ -1,0 +1,39 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Large local data and experiment outputs
+Datasets/
+reddots/
+reddots/pcm/
+exps/
+
+# Model and checkpoint files
+*.pt
+*.pth
+*.ckpt
+*.model
+*.pdf
+*.zip
+
+# Logs and temporary outputs
+*.log
+*.tmp
+*.swp

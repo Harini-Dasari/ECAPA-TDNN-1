@@ -2,10 +2,50 @@
 This is the main code of the ECAPATDNN project, to define the parameters and build the construction
 '''
 
-import argparse, glob, os, torch, warnings, time
+import argparse, glob, os, torch, warnings, time, sys
 from tools import *
 from dataLoader import train_loader
 from ECAPAModel import ECAPAModel
+import csv
+import matplotlib.pyplot as plt
+
+# Add a function to evaluate specific thresholds
+def evaluate_fixed_thresholds(model, eval_list, eval_path, thresholds, output_dir):
+	"""
+	Evaluate the model at specific thresholds using cached scores from eval_network.
+	This is fast because it uses pre-computed scores instead of recomputing embeddings.
+	"""
+	from tools import ComputeErrorRates
+	
+	# Use cached scores from the model (computed during eval_network)
+	scores = model.cached_scores
+	labels = model.cached_labels
+	
+	# Compute metrics for each threshold
+	fnrs, fprs, computed_thresholds = ComputeErrorRates(scores, labels)
+	
+	results = {}
+	for threshold in thresholds:
+		# Find the closest threshold in the computed thresholds
+		idx = 0
+		for i, t in enumerate(computed_thresholds):
+			if abs(t - threshold) < abs(computed_thresholds[idx] - threshold):
+				idx = i
+		
+		# Compute FAR and FRR at this threshold
+		# FAR = FPR (False Positive Rate)
+		# FRR = FNR (False Negative Rate)
+		far = fprs[idx] / (fprs[idx] + (len(labels) - sum(labels)))  # FP / (FP + TN)
+		frr = fnrs[idx] / sum(labels)  # FN / (FN + TP)
+		
+		# EER approximation at this threshold
+		eer = (far + frr) / 2
+		
+		results[threshold] = {'EER': eer, 'FAR': far, 'FRR': frr}
+		print(f"Threshold: {threshold:.3f}, EER: {eer:.4f}, FAR: {far:.4f}, FRR: {frr:.4f}")
+		sys.stdout.flush()
+	
+	return results
 
 parser = argparse.ArgumentParser(description = "ECAPA_trainer")
 ## Training Settings
@@ -34,6 +74,8 @@ parser.add_argument('--s',       type=float, default=30,     help='Loss scale in
 parser.add_argument('--n_class', type=int,   default=5994,   help='Number of speakers')
 
 ## Command
+parser.add_argument('--visualize_scores', dest='visualize_scores', action='store_true', help='Visualize score distributions')
+## parser.add_argument('--visualize_scores', dest='visualize_scores', action='store_true', help='Visualize score distributions')
 parser.add_argument('--eval',    dest='eval', action='store_true', help='Only do evaluation')
 
 ## Initialization
@@ -43,8 +85,11 @@ args = parser.parse_args()
 args = init_args(args)
 
 ## Define the data loader
-trainloader = train_loader(**vars(args))
-trainLoader = torch.utils.data.DataLoader(trainloader, batch_size = args.batch_size, shuffle = True, num_workers = args.n_cpu, drop_last = True)
+if not args.eval:
+    trainloader = train_loader(**vars(args))
+    trainLoader = torch.utils.data.DataLoader(
+        trainloader, batch_size=args.batch_size, shuffle=True, num_workers=args.n_cpu, drop_last=True
+    )
 
 ## Search for the exist models
 modelfiles = glob.glob('%s/model_0*.model'%args.model_save_path)
@@ -57,6 +102,84 @@ if args.eval == True:
 	s.load_parameters(args.initial_model)
 	EER, minDCF = s.eval_network(eval_list = args.eval_list, eval_path = args.eval_path)
 	print("EER %2.2f%%, minDCF %.4f%%"%(EER, minDCF))
+	sys.stdout.flush()
+	
+	# Evaluate fixed thresholds
+	print("\n========== FIXED THRESHOLDS EVALUATION ==========")
+	sys.stdout.flush()
+	print("Debugging: --eval flag detected. Starting evaluation for fixed thresholds.")
+	sys.stdout.flush()
+	fixed_thresholds = [0.30, 0.31, 0.32, 0.33, 0.34]
+	print(f"Debugging: Fixed thresholds to evaluate - {fixed_thresholds}")
+	sys.stdout.flush()
+	
+	# Log to file to ensure code execution
+	log_file = os.path.join(args.save_path, "eval_debug.log")
+	with open(log_file, "w") as f:
+		f.write("Starting fixed threshold evaluation\n")
+	
+	results = evaluate_fixed_thresholds(
+		model=s,
+		eval_list=args.eval_list,
+		eval_path=args.eval_path,
+		thresholds=fixed_thresholds,
+		output_dir=args.save_path
+	)
+	# Enhanced debugging output
+	print("Debugging: Starting to save results.")
+	sys.stdout.flush()
+	print(f"Debugging: Results dictionary: {results}")
+	sys.stdout.flush()
+	
+	# Ensure output directory exists
+	if not os.path.exists(args.save_path):
+		os.makedirs(args.save_path)
+		print(f"Debugging: Created directory {args.save_path}")
+		sys.stdout.flush()
+	
+	# Save results to a CSV file
+	csv_file_path = os.path.join(args.save_path, "threshold_030_034_results.csv")
+	try:
+		with open(csv_file_path, "w", newline="") as csvfile:
+			csvwriter = csv.writer(csvfile)
+			csvwriter.writerow(["Threshold", "EER", "FAR", "FRR"])
+			for threshold, metrics in results.items():
+				csvwriter.writerow([threshold, metrics['EER'], metrics['FAR'], metrics['FRR']])
+		print(f"Debugging: CSV file successfully saved to {csv_file_path}")
+		sys.stdout.flush()
+	except Exception as e:
+		print(f"Debugging: Error saving CSV file: {e}")
+		sys.stdout.flush()
+	
+	# Save FAR/FRR vs Threshold plot
+	thresholds = list(results.keys())
+	far = [metrics['FAR'] for metrics in results.values()]
+	frr = [metrics['FRR'] for metrics in results.values()]
+
+	plt.figure()
+	plt.plot(thresholds, far, label='FAR', color='red')
+	plt.plot(thresholds, frr, label='FRR', color='blue')
+	plt.title('FAR/FRR vs Threshold')
+	plt.xlabel('Threshold')
+	plt.ylabel('Error Rate')
+	plt.legend()
+	plot_file_path = os.path.join(args.save_path, "far_frr_vs_threshold_030_034.png")
+	try:
+		plt.savefig(plot_file_path)
+		plt.close()
+		print(f"Debugging: Plot successfully saved to {plot_file_path}")
+		sys.stdout.flush()
+	except Exception as e:
+		print(f"Debugging: Error saving plot: {e}")
+		sys.stdout.flush()
+	
+	# Final confirmation
+	if os.path.exists(csv_file_path):
+		print(f"✓ CSV file confirmed saved: {csv_file_path}")
+	else:
+		print(f"✗ CSV file NOT found at: {csv_file_path}")
+	sys.stdout.flush()
+	
 	quit()
 
 ## If initial_model is exist, system will train from the initial_model
