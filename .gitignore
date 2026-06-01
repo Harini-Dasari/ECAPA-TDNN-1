@@ -28,13 +28,17 @@ ENV/
 
 # Datasets and Large Audio files
 Voxceleb/
+Reddots/
 *.wav
 *.flac
 *.mp3
+*.pcm
+
+# Outputs and logs
 
 
-
-
+# Other unneeded files
+get-pip.py
 # OS generated files
 .DS_Store
 Thumbs.db
