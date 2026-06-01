@@ -187,10 +187,27 @@ class ECAPA_TDNN(nn.Module):
 
         global_x = torch.cat((x,torch.mean(x,dim=2,keepdim=True).repeat(1,1,t), torch.sqrt(torch.var(x,dim=2,keepdim=True).clamp(min=1e-4)).repeat(1,1,t)), dim=1)
         
-        w = self.attention(global_x)
-
-        mu = torch.sum(x * w, dim=2)
-        sg = torch.sqrt( ( torch.sum((x**2) * w, dim=2) - mu**2 ).clamp(min=1e-4) )
+        # 1. Extract logits by bypassing the final Softmax(dim=2)
+        w_logits = global_x
+        for i in range(len(self.attention) - 1):
+            w_logits = self.attention[i](w_logits)
+            
+        # Step 1: Compute channel-wise distribution and entropy
+        a = torch.softmax(w_logits, dim=1)
+        H = -torch.sum(a * torch.log(a + 1e-9), dim=1)
+        
+        # Step 2: Convert to confidence
+        C_channels = a.shape[1]
+        alpha = 1.0 - H / math.log(C_channels)
+        
+        # Step 3: Normalize across frames
+        alpha_hat = alpha / torch.sum(alpha, dim=1, keepdim=True)
+        
+        # Expand alpha_hat to broadcast across channels for weighted pooling
+        alpha_hat_expanded = alpha_hat.unsqueeze(1)
+        
+        mu = torch.sum(x * alpha_hat_expanded, dim=2)
+        sg = torch.sqrt( ( torch.sum((x**2) * alpha_hat_expanded, dim=2) - mu**2 ).clamp(min=1e-4) )
 
         x = torch.cat((mu,sg),1)
         x = self.bn5(x)
