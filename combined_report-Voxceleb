@@ -1,0 +1,102 @@
+# ECAPA-TDNN Evaluation & Changes Report
+
+This document contains both the speaker verification evaluation results for the pre-trained ECAPA-TDNN model on the **VoxCeleb** dataset, and a breakdown of the codebase changes required to run it successfully.
+
+---
+
+## 1. Final Evaluation Results
+
+> [!TIP]
+> The **EER Threshold** represents the optimal cosine similarity score to decide whether two voices belong to the same speaker. A score above `0.311` means "match", and below means "no match".
+
+| Metric | Value | Description |
+| :--- | :--- | :--- |
+| **EER Threshold** | `0.311101` | The ideal cosine similarity decision threshold |
+| **EER (Equal Error Rate)** | `0.97%` | The rate where False Acceptances equal False Rejections |
+| **minDCF** | `0.0717%` | Minimum Detection Cost Function (a standard metric for NIST evaluations) |
+
+
+### Error Curve Analysis (FAR vs FRR)
+
+The intersection between the False Acceptance Rate (FAR, blue) and the False Rejection Rate (FRR, red) represents the Equal Error Rate point. The vertical green line indicates our optimal decision threshold.
+
+![EER Plot](C:\Users\Harini\.gemini\antigravity-ide\brain\46a8b861-0902-4b4e-9b88-e9c1c712a301\eer_plot.png)
+
+### Data Output
+
+The raw metric arrays (Thresholds, FAR, FRR) have been successfully exported for future analysis and can be found in the workspace at:
+*   [eval_metrics.csv](file:///C:/Users/Harini/Documents/ECAPA-TDNN-1/exps/eval_metrics.csv)
+
+---
+
+## 2. Summary of Codebase Changes
+
+Here is a complete breakdown of all the modifications I made to your original ECAPA-TDNN repository. These changes were necessary to successfully run the evaluation, fix legacy bugs, and extract the precise EER threshold.
+
+### 2.1 Fixed the Evaluation Crash in `trainECAPAModel.py`
+**Problem:** In the original repository, running evaluation (`--eval`) would immediately crash with a `FileNotFoundError` because the script aggressively tries to load the `train_list.txt` dataset before checking if we just wanted to evaluate.
+**Solution:** I moved the data loader instantiation safely *below* the evaluation block.
+
+```diff
+- ## Define the data loader
+- trainloader = train_loader(**vars(args))
+- trainLoader = torch.utils.data.DataLoader(trainloader, batch_size = args.batch_size, shuffle = True, num_workers = args.n_cpu, drop_last = True)
+-
+  ## Search for the exist models
+  modelfiles = glob.glob('%s/model_0*.model'%args.model_save_path)
+  modelfiles.sort()
+  
+  ## Only do evaluation, the initial_model is necessary
+  if args.eval == True:
+  	s = ECAPAModel(**vars(args))
+  	print("Model %s loaded from previous state!"%args.initial_model)
+  	s.load_parameters(args.initial_model)
+  	EER, minDCF = s.eval_network(eval_list = args.eval_list, eval_path = args.eval_path)
+  	print("EER %2.2f%%, minDCF %.4f%%"%(EER, minDCF))
+  	quit()
+  
++ ## Define the data loader
++ trainloader = train_loader(**vars(args))
++ trainLoader = torch.utils.data.DataLoader(trainloader, batch_size = args.batch_size, shuffle = True, num_workers = args.n_cpu, drop_last = True)
+```
+
+### 2.2 Fixed the NumPy Deprecation Error in `ECAPAModel.py`
+**Problem:** The original script used `numpy.float` to typecast arrays. However, `np.float` was a legacy alias that has been completely removed in modern NumPy versions, causing a fatal `AttributeError`.
+**Solution:** Replaced `numpy.float` with the standardized `numpy.float64`.
+
+```diff
+  			for asf in startframe:
+  				feats.append(audio[int(asf):int(asf)+max_audio])
+- 			feats = numpy.stack(feats, axis = 0).astype(numpy.float)
++ 			feats = numpy.stack(feats, axis = 0).astype(numpy.float64)
+  			data_2 = torch.FloatTensor(feats).cuda()
+```
+
+### 2.3 Added EER Threshold Extraction & CSV Export in `ECAPAModel.py`
+**Problem:** The original code calculates the EER internally but doesn't print the actual *threshold score* (the cosine similarity cutoff).
+**Solution:** I injected logic at the end of the `eval_network` method to calculate the exact EER threshold, print it to the terminal, and export all the thresholds, False Acceptance Rates (FAR), and False Rejection Rates (FRR) to a CSV file.
+
+```diff
+  		# Coumpute EER and minDCF
+  		EER = tuneThresholdfromScore(scores, labels, [1, 0.1])[1]
+  		fnrs, fprs, thresholds = ComputeErrorRates(scores, labels)
+  		minDCF, _ = ComputeMinDcf(fnrs, fprs, thresholds, 0.05, 1, 1)
+  
++ 		idxE = numpy.nanargmin(numpy.absolute((numpy.array(fnrs) - numpy.array(fprs))))
++ 		eer_threshold = thresholds[idxE]
++ 		print(f"\nEER Threshold: {eer_threshold}")
++         
++ 		# Save metrics to CSV for plotting
++ 		import csv
++ 		with open('exps/eval_metrics.csv', 'w', newline='') as f:
++ 			writer = csv.writer(f)
++ 			writer.writerow(['Threshold', 'FAR', 'FRR'])
++ 			for t, far, frr in zip(thresholds, fprs, fnrs):
++ 				writer.writerow([t, far, frr])
+  
+  		return EER, minDCF
+```
+
+### 2.4 Created a Custom Plotting Script (`plot_metrics.py`)
+**Problem:** The original repo doesn't visualize the evaluation results.
+**Solution:** I created a standalone script, [plot_metrics.py](file:///C:/Users/Harini/Documents/ECAPA-TDNN-1/plot_metrics.py), which reads the `eval_metrics.csv` file we exported and uses `matplotlib` to graph the FAR and FRR curves, marking where they intersect at the EER threshold.

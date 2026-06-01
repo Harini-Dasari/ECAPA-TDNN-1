@@ -68,7 +68,7 @@ class ECAPAModel(nn.Module):
 			startframe = numpy.linspace(0, audio.shape[0]-max_audio, num=5)
 			for asf in startframe:
 				feats.append(audio[int(asf):int(asf)+max_audio])
-			feats = numpy.stack(feats, axis = 0).astype(numpy.float)
+			feats = numpy.stack(feats, axis = 0).astype(numpy.float64)
 			data_2 = torch.FloatTensor(feats).cuda()
 			# Speaker embeddings
 			with torch.no_grad():
@@ -90,10 +90,34 @@ class ECAPAModel(nn.Module):
 			scores.append(score)
 			labels.append(int(line.split()[0]))
 			
+		# Export individual trial predictions at threshold 0.31
+		import csv
+		fixed_threshold = 0.31
+		with open('exps/trial_predictions.csv', 'w', newline='') as f:
+			writer = csv.writer(f)
+			writer.writerow(['Audio_1', 'Audio_2', 'GroundTruth', 'Score', 'Prediction_0.31', 'IsCorrect'])
+			for line, score, label in zip(lines, scores, labels):
+				parts = line.split()
+				pred = 1 if score >= fixed_threshold else 0
+				is_correct = (pred == label)
+				writer.writerow([parts[1], parts[2], label, score, pred, is_correct])
+			
 		# Coumpute EER and minDCF
 		EER = tuneThresholdfromScore(scores, labels, [1, 0.1])[1]
 		fnrs, fprs, thresholds = ComputeErrorRates(scores, labels)
 		minDCF, _ = ComputeMinDcf(fnrs, fprs, thresholds, 0.05, 1, 1)
+
+		idxE = numpy.nanargmin(numpy.absolute((numpy.array(fnrs) - numpy.array(fprs))))
+		eer_threshold = thresholds[idxE]
+		print(f"\nEER Threshold: {eer_threshold}")
+        
+		# Save metrics to CSV for plotting
+		import csv
+		with open('exps/eval_metrics.csv', 'w', newline='') as f:
+			writer = csv.writer(f)
+			writer.writerow(['Threshold', 'FAR', 'FRR'])
+			for t, far, frr in zip(thresholds, fprs, fnrs):
+				writer.writerow([t, far, frr])
 
 		return EER, minDCF
 
