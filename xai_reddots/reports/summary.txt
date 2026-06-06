@@ -1,0 +1,6 @@
+Phrase: My voice is my password
+Recordings: 31
+
+Highest entropy word: voice (0.01)
+Lowest entropy word: My (0.00)
+Top-2 concentration: 42%

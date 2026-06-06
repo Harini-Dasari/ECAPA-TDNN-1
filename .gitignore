@@ -2,8 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
 
 # Distribution / packaging
@@ -15,30 +13,51 @@ dist/
 
 # Virtual Environments
 .env
+.env.local
+.env.development
+.env.test
+.env.production
 .venv
 env/
 venv/
 ENV/
 
-# VS Code / IDEs
+# VS Code / IDEs / Local Editor configurations
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Datasets and Large Audio files
+# Project/Internal Tools Cache
+.gemini/
+.pytest_cache/
+
+# Datasets
 Voxceleb/
 Reddots/
+
+# Large Audio Files
 *.wav
 *.flac
 *.mp3
 *.pcm
+xai_reddots/temp_wavs/
 
-# Outputs and logs
+# Model Checkpoints and Scoring Outputs
+exps/
+exps_reddots/
 
+# Logs and Summary Files
+*.log
+Voxceleb-logs
+Reddots-logs
+entropy-attention-summary*
+xai_reddots-summary*
+combined_report-Voxceleb
 
-# Other unneeded files
+# Installer/Temp scripts
 get-pip.py
+
 # OS generated files
 .DS_Store
 Thumbs.db

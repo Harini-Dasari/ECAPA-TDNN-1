@@ -1,0 +1,94 @@
+# Walkthrough: ECAPA-TDNN Speaker XAI Dashboards
+
+## Summary of Work Done
+
+All three speaker dashboards for **"My voice is my password"** have been successfully generated with the full averaged pipeline and **grayscale spectrogram** (`gray_r`, `shading='nearest'`) style in Panels 3 & 4.
+
+---
+
+## Pipeline Overview
+
+For each speaker, the dashboard script:
+1. Loads **all recordings** of that speaker saying the target phrase
+2. Extracts the ECAPA-TDNN attention profile for each recording
+3. **Interpolates** all profiles, waveform envelopes, and spectrograms to a common timeline
+4. **Averages** across all recordings
+5. Generates a **7-panel dashboard** with:
+   - Panel 1: Word timeline (WhisperX alignment)
+   - Panel 2: Phoneme timeline
+   - Panel 3: Average Mel spectrogram (grayscale)
+   - Panel 4: Average Mel spectrogram + overlaid attention curve
+   - Panel 5: ECAPA entropy-derived attention (mean ± std)
+   - Panel 6: Attention + phoneme boundaries
+   - Panel 7: Phoneme attention ranking (horizontal bar chart)
+
+---
+
+## Results
+
+### Speaker m0004 (6 recordings)
+- **Pearson Correlation** (RMS Energy vs. Entropy Attention): **0.6936**
+- Output: [m0004_my_voice_is_my_password_entropy_dashboard.png](file:///c:/Users/Harini/Documents/ECAPA-TDNN-1/xai_reddots/plots/m0004_my_voice_is_my_password_entropy_dashboard.png)
+
+![m0004 Speaker Dashboard](C:/Users/Harini/.gemini/antigravity-ide/brain/05046dd2-9762-451b-9375-758d2ce57192/m0004_my_voice_is_my_password_entropy_dashboard.png)
+
+---
+
+### Speaker m0001 (31 recordings)
+- **Pearson Correlation** (RMS Energy vs. Entropy Attention): **-0.1739**
+- Output: [m0001_my_voice_is_my_password_entropy_dashboard.png](file:///c:/Users/Harini/Documents/ECAPA-TDNN-1/xai_reddots/plots/m0001_my_voice_is_my_password_entropy_dashboard.png)
+
+![m0001 Speaker Dashboard](C:/Users/Harini/.gemini/antigravity-ide/brain/05046dd2-9762-451b-9375-758d2ce57192/m0001_my_voice_is_my_password_entropy_dashboard.png)
+
+---
+
+### Speaker m0002 (29 recordings)
+- **Pearson Correlation** (RMS Energy vs. Entropy Attention): **0.5527**
+- Output: [m0002_my_voice_is_my_password_entropy_dashboard.png](file:///c:/Users/Harini/Documents/ECAPA-TDNN-1/xai_reddots/plots/m0002_my_voice_is_my_password_entropy_dashboard.png)
+
+![m0002 Speaker Dashboard](C:/Users/Harini/.gemini/antigravity-ide/brain/05046dd2-9762-451b-9375-758d2ce57192/m0002_my_voice_is_my_password_entropy_dashboard.png)
+
+---
+
+## File Structure (xai_reddots/)
+
+```
+xai_reddots/
+├── plots/               ← Dashboard PNG images (one per speaker)
+│   ├── m0004_my_voice_is_my_password_entropy_dashboard.png
+│   ├── m0001_my_voice_is_my_password_entropy_dashboard.png
+│   └── m0002_my_voice_is_my_password_entropy_dashboard.png
+│
+├── attention/           ← Frame-by-frame attention profiles
+│   ├── m0004_my_voice_is_my_password_attention.csv
+│   ├── m0001_my_voice_is_my_password_attention.csv
+│   └── m0002_my_voice_is_my_password_attention.csv
+│
+├── csv/                 ← Phoneme-level ranked attention data
+│   ├── m0004_my_voice_is_my_password_ecapa_entropy_phenome_attention.csv
+│   ├── m0001_my_voice_is_my_password_ecapa_entropy_phenome_attention.csv
+│   └── m0002_my_voice_is_my_password_ecapa_entropy_phenome_attention.csv
+│
+├── timelines/           ← WhisperX phoneme/word timeline JSONs
+│   ├── m0004_my_voice_is_my_password_timeline.json
+│   ├── m0001_my_voice_is_my_password_timeline.json
+│   └── m0002_my_voice_is_my_password_timeline.json
+│
+└── trail_grphs/         ← Trial spectrogram style explorations
+    ├── spectrogram_style1_2d_heatmap.png
+    ├── spectrogram_style2_3d_surface.png
+    ├── spectrogram_style3_contour.png
+    ├── spectrogram_style4_waterfall.png
+    ├── spectrogram_style5_2d_waterfall.png
+    ├── spectrogram_style6_gray.png
+    └── spectrogram_style7_gray_waterfall.png
+```
+
+## Spectrogram Style Used in Dashboard
+
+- **Colormap**: `gray_r` (reversed grayscale — dark = high energy, light = low energy)
+- **Shading**: `nearest` (discrete block cells, no blurring)
+- **Dynamic range**: 45 dB window from 99.9th percentile peak
+
+> [!TIP]
+> The grayscale style was selected after exploring 7 different spectrogram representations. It gives the clearest phoneme energy bands without color distraction, making it ideal for publications.
