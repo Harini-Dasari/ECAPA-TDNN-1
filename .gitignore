@@ -58,6 +58,11 @@ combined_report-Voxceleb
 # Installer/Temp scripts
 get-pip.py
 
+# Method 1 (Temporal) Outputs
+training_v2/exps_modelA/
+xai_reddots_temporal/outputs/
+xai_reddots_temporal/plots/
+
 # OS generated files
 .DS_Store
 Thumbs.db
